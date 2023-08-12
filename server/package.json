@@ -1,0 +1,8 @@
+{
+  "name": "omni-extension-document_processing",
+  "type": "module",
+  "packageManager": "yarn@3.3.1",
+  "dependencies": {
+    "pdf2json": "^3.0.4"
+  }
+}
