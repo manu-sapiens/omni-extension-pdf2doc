@@ -127,9 +127,7 @@ function console_log(...args)
 {
     if (VERBOSE == true)
     {
-        //omnilog.log("------ extension: document_processing -------");
         omnilog.log(...args);
-        //omnilog.log("\n");
     }
 }
 

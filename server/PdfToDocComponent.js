@@ -6,10 +6,11 @@ const NS_ONMI = 'document_processing';
 import PDFParser from 'pdf2json';
 import { initialize_hasher, DEFAULT_HASHER_MODEL } from './utils/hashers.js'
 import { save_text_to_cdn } from './utils/cdn.js';
-import { is_valid, clean_string, console_log } from './utils/utils.js';
+import { is_valid, clean_string, console_log, rebuildToTicketObjectsIfNeeded, parse_text_to_array } from './utils/utils.js';
 import { user_db_delete, user_db_get, user_db_put } from './utils/database.js';
 
 import { parsePDF, extractTextFields } from './pdf_processing.js';
+import { cp } from 'fs';
 
 
 let load_pdf_component = OAIBaseComponent
@@ -30,15 +31,23 @@ let load_pdf_component = OAIBaseComponent
 
 // Adding input(s)
 const inputs = [
-  { name: 'documents', type: 'array', customSocket: 'documentArray', description: 'PDF Documents to be converted' },
+  { name: 'documents', type: 'array', customSocket: 'documentArray', title: 'Text document(s) to process', defaultValue: [] },
+  { name: 'url', type: 'string', title: 'and/or PDF url(s)', customSocket: 'text' },
   { name: 'overwrite', type: 'boolean', defaultValue: false, description: 'Overwrite the existing files in the CDN' },
 ];
 load_pdf_component = setComponentInputs(load_pdf_component, inputs);
+
+// Adding control(s)
+const controls = [
+  { name: "documents", placeholder: "AlpineCodeMirrorComponent" },
+];
+load_pdf_component = setComponentControls(load_pdf_component, controls);
 
 // Adding outpu(t)
 const outputs = [
   { name: 'documents', type: 'array', customSocket: 'documentArray', description: 'The converted documents' },
   { name: 'files', type: 'array', customSocket: 'cdnObjectArray', description: 'The converted files' },
+  { name: 'message', type: 'string', customSocket: 'text', description: 'message from the block!' },
 ];
 load_pdf_component = setComponentOutputs(load_pdf_component, outputs);
 
@@ -48,22 +57,43 @@ load_pdf_component.setMacro(OmniComponentMacroTypes.EXEC, load_pdf_parse);
 
 
 async function load_pdf_parse(payload, ctx) {
-  const { documents, overwrite } = payload;
+  const documents = payload.documents;
+  const url = payload.url;
+  const overwrite = payload.overwrite;
 
-  let return_value = { result: { "ok": false }, documents: [], files: [] };
-  if (documents) {
-    const output_cdns = await pdf_to_doc_function(ctx, documents, overwrite);
-    return_value = { result: { "ok": true }, documents: output_cdns, files: output_cdns };
-  }
+  const function_result = await pdf_to_doc_function(ctx, documents, url, overwrite);
+  const return_value = { result: { "ok": true }, documents: function_result.cdns, files: function_result.cdns};
 
   return return_value;
 }
 
 
 // ---------------------------------------------------------------------------
-async function pdf_to_doc_function(ctx, documents, overwrite = false) {
+async function pdf_to_doc_function(ctx, passed_documents_cdns, url, overwrite = false) {
 
   console.time("load_pdf_component_processTime");
+
+  let passed_documents_are_valid = (passed_documents_cdns != null && passed_documents_cdns != undefined && Array.isArray(passed_documents_cdns) && passed_documents_cdns.length > 0);
+  if (passed_documents_are_valid) {
+      console_log(`read #${passed_documents_cdns.lentgh} from "documents" input, passed_documents_cdns = ${JSON.stringify(passed_documents_cdns)}`);
+    }
+
+  const parsedArray = parse_text_to_array(url);
+  console_log("~~~~~~~~~~~~~~~~~~~~~~~~~~");
+  console_log(`parsedArray #  ${parsedArray.length}`);
+  console_log(`parsedArray  ${JSON.stringify(parsedArray)}`);
+
+  const cdn_tickets = rebuildToTicketObjectsIfNeeded(parsedArray);
+  console_log(`cdn_tickets #  ${cdn_tickets.length}`);
+  console_log(`cdn_tickets  ${JSON.stringify(cdn_tickets)}`);
+
+  let documents = [
+    ...(passed_documents_cdns || []), // If array1 is null, spread an empty array
+    ...(cdn_tickets || [])  // If array2 is null, spread an empty array
+  ];
+
+  console_log(`documents  ${JSON.stringify(documents)}`);
+
   if (is_valid(documents) == false) throw new Error(`load_pdf_component: documents_array = ${JSON.stringify(documents)} is invalid`);
 
   const pdfParser = new PDFParser();
@@ -75,8 +105,10 @@ async function pdf_to_doc_function(ctx, documents, overwrite = false) {
   const texts_cdns = [];
   for (let i = 0; i < documents.length; i++) {
     const documents_cdn = documents[i];
-    if ("ticket" in documents_cdn == false) throw new Error(`get_json_from_cdn: documents_cdn = ${JSON.stringify(documents_cdn)} is invalid`);
+    console_log(`documents_cdn = ${JSON.stringify(documents_cdn)}`);
 
+    if (!documents_cdn || !documents_cdn.ticket) throw new Error(`get_json_from_cdn: documents_cdn = ${JSON.stringify(documents_cdn)} is invalid`);
+    
     const response_from_cdn = await ctx.app.cdn.get(documents_cdn.ticket, null, 'asBase64');
     if (response_from_cdn == null) throw new Error(`get_json_from_cdn: document = ${JSON.stringify(response_from_cdn)} is invalid`);
 
@@ -115,7 +147,7 @@ async function pdf_to_doc_function(ctx, documents, overwrite = false) {
   }
 
   console.timeEnd("load_pdf_component_processTime");
-  return texts_cdns;
+  return {cdns: texts_cdns};
 }
 
 const PdfToDocComponent = load_pdf_component.toJSON();
