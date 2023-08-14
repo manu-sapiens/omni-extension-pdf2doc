@@ -1,8 +1,61 @@
 {
-  "name": "omni-extension-document_processing",
+  "name": "pdf2json",
+  "version": "3.0.4",
+  "description": "PDF file parser that converts PDF binaries to text based JSON, powered by porting a fork of PDF.JS to Node.js",
+  "keywords": [
+    "pdf",
+    "pdf parser",
+    "pdf2json",
+    "convert pdf to json",
+    "server side PDF parser",
+    "port pdf.js to node.js",
+    "PDF binary to text",
+    "commandline utility to parse pdf to json",
+    "JSON",
+    "javascript",
+    "PDF canvas",
+    "pdf.js fork"
+  ],
   "type": "module",
-  "packageManager": "yarn@3.3.1",
+  "author": {
+    "name": "Modesty Zhang",
+    "email": "modestyz@hotmail.com",
+    "url": "http://www.codeproject.com/script/Articles/MemberArticles.aspx?amid=62372"
+  },
+  "homepage": "https://github.com/modesty/pdf2json",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/modesty/pdf2json.git"
+  },
+  "main": "./pdfparser.js",
+  "typings": "./pdfparser.d.ts",
+  "engines": {
+    "node": ">=18.12.1",
+    "npm": ">=8.19.2"
+  },
+  "bin": {
+    "pdf2json": "./bin/pdf2json.js"
+  },
   "dependencies": {
-    "pdf2json": "^3.0.4"
-  }
+    "@xmldom/xmldom": "^0.8.6"
+  },
+  "devDependencies": {
+    "@types/node": "^18.7.18"
+  },
+  "bundledDependencies": [
+    "@xmldom/xmldom"
+  ],
+  "maintainers": [
+    {
+      "name": "Modesty Zhang",
+      "email": "modestyz@hotmail.com",
+      "url": "http://www.codeproject.com/script/Articles/MemberArticles.aspx?amid=62372"
+    }
+  ],
+  "contributors": [],
+  "bugs": {
+    "url": "http://github.com/modesty/pdf2json/issues"
+  },
+  "license": "Apache-2.0",
+  "readme": "https://github.com/modesty/pdf2json/blob/master/readme.md"
 }
