@@ -2,7 +2,7 @@
   "name": "omni-extension-pii-scrubber",
   "packageManager": "yarn@3.3.1",
   "scripts": {
-    "build": "tsc && esbuild ./extension.js --bundle --outdir=../server --format=esm --platform=node --target=es2020 --external:mercs_rete --analyze --color=true"
+    "build": "esbuild ./extension.js --bundle --outdir=../server --format=esm --platform=node --target=es2020 --external:mercs_rete --analyze --color=true"
   },
   "dependencies": {
     "pdf2json": "^3.0.4"

@@ -9680,9 +9680,9 @@ Object.defineProperty(Emittery, "listenerRemoved", {
   enumerable: true,
   configurable: false
 });
-var DEFAULT_LOG_LEVEL = 2;
 var OmniLogLevels = ((OmniLogLevels2) => {
   OmniLogLevels2[OmniLogLevels2["silent"] = Number.NEGATIVE_INFINITY] = "silent";
+  OmniLogLevels2[OmniLogLevels2["always"] = 0] = "always";
   OmniLogLevels2[OmniLogLevels2["fatal"] = 0] = "fatal";
   OmniLogLevels2[OmniLogLevels2["warning"] = 1] = "warning";
   OmniLogLevels2[OmniLogLevels2["normal"] = 2] = "normal";
@@ -9692,6 +9692,7 @@ var OmniLogLevels = ((OmniLogLevels2) => {
   OmniLogLevels2[OmniLogLevels2["verbose"] = Number.POSITIVE_INFINITY] = "verbose";
   return OmniLogLevels2;
 })(OmniLogLevels || {});
+var DEFAULT_LOG_LEVEL = 2;
 var _OmniLog = class _OmniLog2 {
   constructor() {
     this._status_priority = consola.create({ level: OmniLogLevels.verbose });
@@ -9703,6 +9704,7 @@ var _OmniLog = class _OmniLog2 {
       throw new Error("Log instance duplicate error");
     }
     consola.level = DEFAULT_LOG_LEVEL;
+    this._customLevel = /* @__PURE__ */ new Map();
     _OmniLog2._instance = this;
   }
   get level() {
@@ -9712,6 +9714,9 @@ var _OmniLog = class _OmniLog2 {
     this._status_priority.level = value < 0 ? value : OmniLogLevels.verbose;
     this._log = value >= 3 ? this.__log : this._void;
     consola.level = value;
+    if (value < 0) {
+      this._customLevel.forEach((e) => e = OmniLogLevels.silent);
+    }
   }
   get warn() {
     return consola.warn;
@@ -9757,6 +9762,12 @@ var _OmniLog = class _OmniLog2 {
   }
   restoreConsoleLogger() {
     consola.restoreConsole();
+  }
+  setCustomLevel(id, level) {
+    this._customLevel.set(id, level);
+  }
+  getCustomLevel(id) {
+    return this._customLevel.get(id) ?? DEFAULT_LOG_LEVEL;
   }
 };
 _OmniLog._instance = new _OmniLog();
@@ -10097,7 +10108,7 @@ var App = class {
     this.verbose = loginstance.verbose;
     this.warn = loginstance.warn;
     this.events = new Emittery(
-      omnilog.level >= 4 ? { debug: { name: "app.events", enabled: true } } : void 0
+      omnilog.getCustomLevel("emittery") > OmniLogLevels.silent ? { debug: { name: "app.events", enabled: true } } : void 0
     );
   }
   // registers a service or integration
