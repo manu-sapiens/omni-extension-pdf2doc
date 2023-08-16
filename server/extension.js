@@ -10648,8 +10648,7 @@ var controls = [
 load_pdf_component = setComponentControls(load_pdf_component, controls);
 var outputs = [
   { name: "documents", type: "array", customSocket: "documentArray", description: "The converted documents" },
-  { name: "files", type: "array", customSocket: "cdnObjectArray", description: "The converted files" },
-  { name: "message", type: "string", customSocket: "text", description: "message from the block!" }
+  { name: "files", type: "array", customSocket: "cdnObjectArray", description: "The converted files" }
 ];
 load_pdf_component = setComponentOutputs(load_pdf_component, outputs);
 load_pdf_component.setMacro(OmniComponentMacroTypes.EXEC, load_pdf_parse);

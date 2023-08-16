@@ -1,5 +1,5 @@
 {
-  "name": "omni-extension-pii-scrubber",
+  "name": "omni-extension-pdf2doc",
   "packageManager": "yarn@3.3.1",
   "scripts": {
     "build": "esbuild ./extension.js --bundle --outdir=../server --format=esm --platform=node --target=es2020 --external:mercs_rete --analyze --color=true"
@@ -8,7 +8,6 @@
     "pdf2json": "^3.0.4"
   },
   "devDependencies": {
-    "esbuild": "^0.19.2",
-    "typescript": "^5.1.6"
+    "esbuild": "^0.19.2"
   }
 }
