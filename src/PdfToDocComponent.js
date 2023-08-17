@@ -1,17 +1,13 @@
 // pdftodoc.js
 import { OAIBaseComponent, WorkerContext, OmniComponentMacroTypes } from 'mercs_rete';
 import { setComponentInputs, setComponentOutputs, setComponentControls } from './utils/components_lib.js';
-const NS_ONMI = 'document_processing';
+const NS_ONMI = 'pdf2doc';
 
 import PDFParser from 'pdf2json';
 import { initialize_hasher, DEFAULT_HASHER_MODEL } from './utils/hashers.js'
 import { save_text_to_cdn } from './utils/cdn.js';
 import { is_valid, clean_string, console_log, rebuildToTicketObjectsIfNeeded, parse_text_to_array } from './utils/utils.js';
 import { user_db_delete, user_db_get, user_db_put } from './utils/database.js';
-
-import { parsePDF, extractTextFields } from './pdf_processing.js';
-import { cp } from 'fs';
-
 
 let load_pdf_component = OAIBaseComponent
   .create(NS_ONMI, "pdf2doc")
@@ -31,7 +27,7 @@ let load_pdf_component = OAIBaseComponent
 
 // Adding input(s)
 const inputs = [
-  { name: 'documents', type: 'array', customSocket: 'documentArray', title: 'Text document(s) to process', defaultValue: [] },
+  { name: 'documents', type: 'array', customSocket: 'documentArray', title: 'PDF document(s) to convert', defaultValue: [] },
   { name: 'url', type: 'string', title: 'and/or PDF url(s)', customSocket: 'text' },
   { name: 'overwrite', type: 'boolean', defaultValue: false, description: 'Overwrite the existing files in the CDN' },
 ];
@@ -45,7 +41,7 @@ load_pdf_component = setComponentControls(load_pdf_component, controls);
 
 // Adding outpu(t)
 const outputs = [
-  { name: 'documents', type: 'array', customSocket: 'documentArray', description: 'The converted documents' },
+  { name: 'documents', type: 'array', customSocket: 'documentArray', title: 'TEXT Documents', description: 'The converted documents' },
   { name: 'files', type: 'array', customSocket: 'cdnObjectArray', description: 'The converted files' },
 ];
 load_pdf_component = setComponentOutputs(load_pdf_component, outputs);
@@ -95,12 +91,6 @@ async function pdf_to_doc_function(ctx, passed_documents_cdns, url, overwrite = 
 
   if (is_valid(documents) == false) throw new Error(`load_pdf_component: documents_array = ${JSON.stringify(documents)} is invalid`);
 
-  const pdfParser = new PDFParser();
-  pdfParser.on("pdfParser_dataError", errData => console.error(`pdfParser_dataError in ${JSON.stringify(errData)}`));
-  pdfParser.on("pdfParser_dataReady", pdfData => {
-    console_log(pdfData);
-  });
-
   const texts_cdns = [];
   for (let i = 0; i < documents.length; i++) {
     const documents_cdn = documents[i];
@@ -149,5 +139,63 @@ async function pdf_to_doc_function(ctx, passed_documents_cdns, url, overwrite = 
   return {cdns: texts_cdns};
 }
 
+
+
+async function parsePDFData(buffer)
+{
+    const pdfParser = new PDFParser();
+
+    // Create a promise-based wrapper for the pdfParser.on("pdfParser_dataReady") event
+    const onDataReady = () =>
+        new Promise((resolve) =>
+        {
+            pdfParser.on('pdfParser_dataReady', (pdfData) =>
+            {
+                resolve(pdfData);
+            });
+        });
+
+    pdfParser.on('pdfParser_dataError', (errData) =>
+    {
+        throw new Error (`pdfParser_dataError : ${errData}`)
+    });
+
+    // Parse the PDF buffer
+    pdfParser.parseBuffer(buffer);
+
+    // Wait for the "pdfParser_dataReady" event to be emitted
+    const pdfData = await onDataReady();
+
+    return pdfData;
+}
+
+async function parsePDF(buffer)
+{
+    try
+    {
+        const pdfData = await parsePDFData(buffer);
+        return pdfData;
+    } catch (error)
+    {
+        console.error('Error parsing PDF:', error);
+        throw error;
+    }
+}
+
+function extractTextFields(jsonData) 
+{
+    if (is_valid(jsonData) == false) throw new Error(`extractTextFields: jsonData = ${JSON.stringify(jsonData)} is invalid`);
+    const pages = jsonData.Pages;
+    if (is_valid(pages) == false) throw new Error(`extractTextFields: pages = ${JSON.stringify(pages)} is invalid`);
+
+    const concatenatedTexts = pages.map((page) => 
+    {
+        const texts = page.Texts.map((textObj) => decodeURIComponent(textObj.R[0].T));
+        return texts.join(' ');
+    });
+
+    return concatenatedTexts;
+}
+
 const PdfToDocComponent = load_pdf_component.toJSON();
-export { PdfToDocComponent, pdf_to_doc_function };
+export { PdfToDocComponent, pdf_to_doc_function , parsePDFData,extractTextFields, parsePDF }

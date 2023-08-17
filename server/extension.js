@@ -9745,6 +9745,9 @@ var _OmniLog = class _OmniLog2 {
   get log() {
     return this._log;
   }
+  get assert() {
+    return console.assert;
+  }
   status_start(msg) {
     this._status_priority.start(msg);
   }
@@ -9799,11 +9802,7 @@ var Manager = class {
   async start() {
     for (const [id, child] of this.children) {
       omnilog.log(`child ${id} start`);
-      try {
-        await child.start?.();
-      } catch (e) {
-        omnilog.warn(`child ${id} failed to start with error: ${e}`);
-      }
+      await child.start?.();
     }
     omnilog.log("All children started");
     return true;
@@ -10589,45 +10588,8 @@ async function save_text_to_cdn(ctx, text2) {
   return cdn_response;
 }
 
-// pdf_processing.js
-async function parsePDFData(buffer) {
-  const pdfParser = new PDFParser();
-  const onDataReady = () => new Promise((resolve) => {
-    pdfParser.on("pdfParser_dataReady", (pdfData2) => {
-      resolve(pdfData2);
-    });
-  });
-  pdfParser.on("pdfParser_dataError", (errData) => {
-    throw new Error(`pdfParser_dataError : ${errData}`);
-  });
-  pdfParser.parseBuffer(buffer);
-  const pdfData = await onDataReady();
-  return pdfData;
-}
-async function parsePDF(buffer) {
-  try {
-    const pdfData = await parsePDFData(buffer);
-    return pdfData;
-  } catch (error) {
-    console.error("Error parsing PDF:", error);
-    throw error;
-  }
-}
-function extractTextFields(jsonData) {
-  if (is_valid(jsonData) == false)
-    throw new Error(`extractTextFields: jsonData = ${JSON.stringify(jsonData)} is invalid`);
-  const pages = jsonData.Pages;
-  if (is_valid(pages) == false)
-    throw new Error(`extractTextFields: pages = ${JSON.stringify(pages)} is invalid`);
-  const concatenatedTexts = pages.map((page) => {
-    const texts = page.Texts.map((textObj) => decodeURIComponent(textObj.R[0].T));
-    return texts.join(" ");
-  });
-  return concatenatedTexts;
-}
-
 // PdfToDocComponent.js
-var NS_ONMI = "document_processing";
+var NS_ONMI = "pdf2doc";
 var load_pdf_component = OAIBaseComponent.create(NS_ONMI, "pdf2doc").fromScratch().set("title", "Convert pdf to text document").set("category", "Text Manipulation").set("description", "Convert pdf files to omnitool document format.").setMethod("X-CUSTOM").setMeta({
   source: {
     summary: "Convert pdf files to omnitool document format",
@@ -10637,7 +10599,7 @@ var load_pdf_component = OAIBaseComponent.create(NS_ONMI, "pdf2doc").fromScratch
   }
 });
 var inputs = [
-  { name: "documents", type: "array", customSocket: "documentArray", title: "Text document(s) to process", defaultValue: [] },
+  { name: "documents", type: "array", customSocket: "documentArray", title: "PDF document(s) to convert", defaultValue: [] },
   { name: "url", type: "string", title: "and/or PDF url(s)", customSocket: "text" },
   { name: "overwrite", type: "boolean", defaultValue: false, description: "Overwrite the existing files in the CDN" }
 ];
@@ -10647,7 +10609,7 @@ var controls = [
 ];
 load_pdf_component = setComponentControls(load_pdf_component, controls);
 var outputs = [
-  { name: "documents", type: "array", customSocket: "documentArray", description: "The converted documents" },
+  { name: "documents", type: "array", customSocket: "documentArray", title: "TEXT Documents", description: "The converted documents" },
   { name: "files", type: "array", customSocket: "cdnObjectArray", description: "The converted files" }
 ];
 load_pdf_component = setComponentOutputs(load_pdf_component, outputs);
@@ -10682,11 +10644,6 @@ async function pdf_to_doc_function(ctx, passed_documents_cdns, url, overwrite = 
   console_log(`documents  ${JSON.stringify(documents)}`);
   if (is_valid(documents) == false)
     throw new Error(`load_pdf_component: documents_array = ${JSON.stringify(documents)} is invalid`);
-  const pdfParser = new PDFParser();
-  pdfParser.on("pdfParser_dataError", (errData) => console.error(`pdfParser_dataError in ${JSON.stringify(errData)}`));
-  pdfParser.on("pdfParser_dataReady", (pdfData) => {
-    console_log(pdfData);
-  });
   const texts_cdns = [];
   for (let i = 0; i < documents.length; i++) {
     const documents_cdn = documents[i];
@@ -10725,6 +10682,41 @@ async function pdf_to_doc_function(ctx, passed_documents_cdns, url, overwrite = 
   }
   console.timeEnd("load_pdf_component_processTime");
   return { cdns: texts_cdns };
+}
+async function parsePDFData(buffer) {
+  const pdfParser = new PDFParser();
+  const onDataReady = () => new Promise((resolve) => {
+    pdfParser.on("pdfParser_dataReady", (pdfData2) => {
+      resolve(pdfData2);
+    });
+  });
+  pdfParser.on("pdfParser_dataError", (errData) => {
+    throw new Error(`pdfParser_dataError : ${errData}`);
+  });
+  pdfParser.parseBuffer(buffer);
+  const pdfData = await onDataReady();
+  return pdfData;
+}
+async function parsePDF(buffer) {
+  try {
+    const pdfData = await parsePDFData(buffer);
+    return pdfData;
+  } catch (error) {
+    console.error("Error parsing PDF:", error);
+    throw error;
+  }
+}
+function extractTextFields(jsonData) {
+  if (is_valid(jsonData) == false)
+    throw new Error(`extractTextFields: jsonData = ${JSON.stringify(jsonData)} is invalid`);
+  const pages = jsonData.Pages;
+  if (is_valid(pages) == false)
+    throw new Error(`extractTextFields: pages = ${JSON.stringify(pages)} is invalid`);
+  const concatenatedTexts = pages.map((page) => {
+    const texts = page.Texts.map((textObj) => decodeURIComponent(textObj.R[0].T));
+    return texts.join(" ");
+  });
+  return concatenatedTexts;
 }
 var PdfToDocComponent = load_pdf_component.toJSON();
 
