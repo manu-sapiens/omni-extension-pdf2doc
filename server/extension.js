@@ -10199,22 +10199,28 @@ var App = class {
 App.STATES = STATE;
 var BaseWorkflow = class _BaseWorkflow {
   constructor(id, version, meta) {
-    this.id = id;
-    this.version = version;
-    this.setMeta(meta || null);
+    this.id = id || "";
+    this.version = version || "draft";
+    this.setMeta(meta);
     this.setRete(null);
     this.setAPI(null);
-    this.langchain = null;
+    this.ui = {};
   }
   setMeta(meta) {
-    var _a, _b;
-    this.meta = meta ?? { name: "New Workflow", description: "No description.", pictureUrl: "omni.png" };
+    var _a, _b, _c, _d;
+    meta = JSON.parse(JSON.stringify(meta || {}));
+    meta = meta || { name: "New Recipe", description: "No description.", pictureUrl: "omni.png", author: "Anonymous" };
+    this.meta = meta;
     this.meta.updated = Date.now();
     (_a = this.meta).created ?? (_a.created = Date.now());
     (_b = this.meta).tags ?? (_b.tags = []);
     this.meta.updated = Date.now();
+    (_c = this.meta).author || (_c.author = "Anonymous");
+    (_d = this.meta).help || (_d.help = "");
     this.meta.name = (0, import_insane.default)(this.meta.name, { allowedTags: [], allowedAttributes: {} });
     this.meta.description = (0, import_insane.default)(this.meta.description, { allowedTags: [], allowedAttributes: {} });
+    this.meta.author = (0, import_insane.default)(this.meta.author, { allowedTags: [], allowedAttributes: {} });
+    this.meta.help = (0, import_insane.default)(this.meta.help, { allowedTags: [], allowedAttributes: {} });
     return this;
   }
   setRete(rete) {
@@ -10227,6 +10233,11 @@ var BaseWorkflow = class _BaseWorkflow {
     this.meta.updated = Date.now();
     return this;
   }
+  setUI(ui) {
+    this.ui = ui ?? {};
+    this.meta.updated = Date.now();
+    return this;
+  }
   toJSON() {
     return {
       id: this.id,
@@ -10234,15 +10245,15 @@ var BaseWorkflow = class _BaseWorkflow {
       meta: this.meta,
       rete: this.rete,
       api: this.api,
-      langchain: this.langchain
+      ui: this.ui
     };
   }
   static fromJSON(json) {
     const result = new _BaseWorkflow(json.id, json.version);
-    result.langchain = json.langchain;
     result.setMeta(json.meta);
     result.setRete(json.rete);
     result.setAPI(json.api);
+    result.setUI(json.ui);
     return result;
   }
 };
@@ -10256,7 +10267,14 @@ var _Workflow = class _Workflow2 extends BaseWorkflow {
     this.publishedTo = [];
   }
   toJSON() {
-    return { ...super.toJSON(), _id: this._id, _rev: this._rev, owner: this.owner, org: this.org, publishedTo: this.publishedTo };
+    return {
+      ...super.toJSON(),
+      _id: this._id,
+      _rev: this._rev,
+      owner: this.owner,
+      org: this.org,
+      publishedTo: this.publishedTo
+    };
   }
   static fromJSON(json) {
     let id = json._id?.replace("wf:", "") || json.id;
@@ -10264,11 +10282,11 @@ var _Workflow = class _Workflow2 extends BaseWorkflow {
       id = json.id;
     }
     const result = new _Workflow2(id, json.version ?? "draft", { owner: json.owner || json.meta.owner, org: json.org });
-    result.langchain = json.langchain;
     result.publishedTo = json.publishedTo;
     result.setMeta(json.meta);
     result.setRete(json.rete);
     result.setAPI(json.api);
+    result.setUI(json.ui);
     if (json._rev) {
       result._rev = json._rev;
     }
@@ -10609,39 +10627,32 @@ var controls = [
 ];
 load_pdf_component = setComponentControls(load_pdf_component, controls);
 var outputs = [
-  { name: "documents", type: "array", customSocket: "documentArray", title: "TEXT Documents", description: "The converted documents" },
-  { name: "files", type: "array", customSocket: "cdnObjectArray", description: "The converted files" }
+  { name: "documents", type: "array", customSocket: "documentArray", title: "TEXT Documents", description: "The converted documents" }
 ];
 load_pdf_component = setComponentOutputs(load_pdf_component, outputs);
-load_pdf_component.setMacro(OmniComponentMacroTypes.EXEC, load_pdf_parse);
-async function load_pdf_parse(payload, ctx) {
+load_pdf_component.setMacro(OmniComponentMacroTypes.EXEC, parsePayload);
+async function parsePayload(payload, ctx) {
   const documents = payload.documents;
   const url = payload.url;
   const overwrite = payload.overwrite;
-  const function_result = await pdf_to_doc_function(ctx, documents, url, overwrite);
-  const return_value = { result: { "ok": true }, documents: function_result.cdns, files: function_result.cdns };
+  const text_cdns = await pdfToDoc(ctx, documents, url, overwrite);
+  const return_value = { result: { "ok": true }, documents: text_cdns };
   return return_value;
 }
-async function pdf_to_doc_function(ctx, passed_documents_cdns, url, overwrite = false) {
+async function pdfToDoc(ctx, passed_documents_cdns, url, overwrite = false) {
   console.time("load_pdf_component_processTime");
   let passed_documents_are_valid = passed_documents_cdns != null && passed_documents_cdns != void 0 && Array.isArray(passed_documents_cdns) && passed_documents_cdns.length > 0;
   if (passed_documents_are_valid) {
     console_log(`read #${passed_documents_cdns.lentgh} from "documents" input, passed_documents_cdns = ${JSON.stringify(passed_documents_cdns)}`);
   }
   const parsedArray = parse_text_to_array(url);
-  console_log("~~~~~~~~~~~~~~~~~~~~~~~~~~");
-  console_log(`parsedArray #  ${parsedArray.length}`);
-  console_log(`parsedArray  ${JSON.stringify(parsedArray)}`);
   const cdn_tickets = rebuildToTicketObjectsIfNeeded(parsedArray);
-  console_log(`cdn_tickets #  ${cdn_tickets.length}`);
-  console_log(`cdn_tickets  ${JSON.stringify(cdn_tickets)}`);
   let documents = [
     ...passed_documents_cdns || [],
     // If array1 is null, spread an empty array
     ...cdn_tickets || []
     // If array2 is null, spread an empty array
   ];
-  console_log(`documents  ${JSON.stringify(documents)}`);
   if (is_valid(documents) == false)
     throw new Error(`load_pdf_component: documents_array = ${JSON.stringify(documents)} is invalid`);
   const texts_cdns = [];
@@ -10681,7 +10692,7 @@ async function pdf_to_doc_function(ctx, passed_documents_cdns, url, overwrite = 
     texts_cdns.push(texts_cdn);
   }
   console.timeEnd("load_pdf_component_processTime");
-  return { cdns: texts_cdns };
+  return texts_cdns;
 }
 async function parsePDFData(buffer) {
   const pdfParser = new PDFParser();

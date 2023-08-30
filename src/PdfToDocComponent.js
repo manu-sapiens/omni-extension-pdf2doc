@@ -1,3 +1,4 @@
+//@ts-check
 // pdftodoc.js
 import { OAIBaseComponent, WorkerContext, OmniComponentMacroTypes } from 'mercs_rete';
 import { setComponentInputs, setComponentOutputs, setComponentControls } from './utils/components_lib.js';
@@ -42,29 +43,28 @@ load_pdf_component = setComponentControls(load_pdf_component, controls);
 // Adding outpu(t)
 const outputs = [
   { name: 'documents', type: 'array', customSocket: 'documentArray', title: 'TEXT Documents', description: 'The converted documents' },
-  { name: 'files', type: 'array', customSocket: 'cdnObjectArray', description: 'The converted files' },
 ];
 load_pdf_component = setComponentOutputs(load_pdf_component, outputs);
 
 
 // Adding _exec function
-load_pdf_component.setMacro(OmniComponentMacroTypes.EXEC, load_pdf_parse);
+load_pdf_component.setMacro(OmniComponentMacroTypes.EXEC, parsePayload);
 
 
-async function load_pdf_parse(payload, ctx) {
+async function parsePayload(payload, ctx) {
   const documents = payload.documents;
   const url = payload.url;
   const overwrite = payload.overwrite;
 
-  const function_result = await pdf_to_doc_function(ctx, documents, url, overwrite);
-  const return_value = { result: { "ok": true }, documents: function_result.cdns, files: function_result.cdns};
+  const text_cdns = await pdfToDoc(ctx, documents, url, overwrite);
+  const return_value = { result: { "ok": true }, documents: text_cdns};
 
   return return_value;
 }
 
 
 // ---------------------------------------------------------------------------
-async function pdf_to_doc_function(ctx, passed_documents_cdns, url, overwrite = false) {
+async function pdfToDoc(ctx, passed_documents_cdns, url, overwrite = false) {
 
   console.time("load_pdf_component_processTime");
 
@@ -74,20 +74,12 @@ async function pdf_to_doc_function(ctx, passed_documents_cdns, url, overwrite = 
     }
 
   const parsedArray = parse_text_to_array(url);
-  console_log("~~~~~~~~~~~~~~~~~~~~~~~~~~");
-  console_log(`parsedArray #  ${parsedArray.length}`);
-  console_log(`parsedArray  ${JSON.stringify(parsedArray)}`);
-
   const cdn_tickets = rebuildToTicketObjectsIfNeeded(parsedArray);
-  console_log(`cdn_tickets #  ${cdn_tickets.length}`);
-  console_log(`cdn_tickets  ${JSON.stringify(cdn_tickets)}`);
 
   let documents = [
     ...(passed_documents_cdns || []), // If array1 is null, spread an empty array
     ...(cdn_tickets || [])  // If array2 is null, spread an empty array
   ];
-
-  console_log(`documents  ${JSON.stringify(documents)}`);
 
   if (is_valid(documents) == false) throw new Error(`load_pdf_component: documents_array = ${JSON.stringify(documents)} is invalid`);
 
@@ -136,7 +128,7 @@ async function pdf_to_doc_function(ctx, passed_documents_cdns, url, overwrite = 
   }
 
   console.timeEnd("load_pdf_component_processTime");
-  return {cdns: texts_cdns};
+  return texts_cdns;
 }
 
 
@@ -198,4 +190,4 @@ function extractTextFields(jsonData)
 }
 
 const PdfToDocComponent = load_pdf_component.toJSON();
-export { PdfToDocComponent, pdf_to_doc_function , parsePDFData,extractTextFields, parsePDF }
+export { PdfToDocComponent, pdfToDoc , parsePDFData, extractTextFields, parsePDF }
