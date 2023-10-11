@@ -1,5 +1,5 @@
 // utils.js
-import { omnilog } from 'mercs_shared'
+import { omnilog } from 'omni-shared'
 
 let VERBOSE = true;
 

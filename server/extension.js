@@ -7082,7 +7082,7 @@ var require_insane = __commonJS({
 });
 
 // PdfToDocComponent.js
-import { OAIBaseComponent, WorkerContext, OmniComponentMacroTypes } from "mercs_rete";
+import { OAIBaseComponent, WorkerContext, OmniComponentMacroTypes } from "omni-sockets";
 
 // utils/components_lib.js
 function generateTitle(name) {
@@ -9260,7 +9260,7 @@ init_core();
 init_consola_06ad8a64();
 init_utils();
 
-// ../../../../shared/lib/index.js
+// ../../../../omni-shared/lib/index.js
 var import_insane = __toESM(require_insane(), 1);
 var anyMap = /* @__PURE__ */ new WeakMap();
 var eventsMap = /* @__PURE__ */ new WeakMap();
@@ -9698,7 +9698,9 @@ var _OmniLog = class _OmniLog2 {
     this._status_priority = consola.create({ level: OmniLogLevels.verbose });
     this._void = (_msg) => {
     };
-    this.__log = (msg) => consola.log(msg);
+    this.__log = (msg) => {
+      consola.log(msg);
+    };
     this._log = DEFAULT_LOG_LEVEL >= 3 ? this.__log : this._void;
     if (_OmniLog2._instance !== void 0) {
       throw new Error("Log instance duplicate error");
@@ -9715,7 +9717,9 @@ var _OmniLog = class _OmniLog2 {
     this._log = value >= 3 ? this.__log : this._void;
     consola.level = value;
     if (value < 0) {
-      this._customLevel.forEach((e) => e = OmniLogLevels.silent);
+      this._customLevel.forEach((e) => {
+        e = OmniLogLevels.silent;
+      });
     }
   }
   get warn() {
@@ -9757,6 +9761,9 @@ var _OmniLog = class _OmniLog2 {
   status_fail(msg) {
     this._status_priority.fail(msg);
   }
+  access(msg) {
+    this._status_priority.trace(msg);
+  }
   createWithTag(id) {
     return consola.withTag(id);
   }
@@ -9771,6 +9778,14 @@ var _OmniLog = class _OmniLog2 {
   }
   getCustomLevel(id) {
     return this._customLevel.get(id) ?? DEFAULT_LOG_LEVEL;
+  }
+  addConsolaReporter(reporter) {
+    consola.addReporter(reporter);
+    this._status_priority.addReporter(reporter);
+  }
+  removeConsolaReporter(reporter) {
+    consola.removeReporter(reporter);
+    this._status_priority.removeReporter(reporter);
   }
 };
 _OmniLog._instance = new _OmniLog();
@@ -10080,6 +10095,61 @@ var { parse: $parse, stringify: $stringify } = JSON;
 var options = { json: true, lossy: true };
 var parse = (str) => deserialize($parse(str));
 var stringify = (any) => $stringify(serialize(any, options));
+var Settings = class {
+  constructor(scope) {
+    this.settings = /* @__PURE__ */ new Map();
+    this.scope = scope;
+  }
+  bindStorage(storage) {
+    this.settings = storage;
+  }
+  // Adds a setting to this system.
+  add(setting) {
+    if (this.settings.has(setting.key)) {
+      omnilog.debug(`Setting ${setting.key} already exists, doing nothing...`);
+      return this;
+    }
+    this.settings.set(setting.key, setting);
+    return this;
+  }
+  // Retrieves a setting by its key.
+  get(key) {
+    return this.settings.get(key);
+  }
+  // Updates a setting's value and validates it.
+  update(key, newValue) {
+    console.log("update", key, newValue);
+    const setting = this.get(key);
+    if (setting) {
+      console.log("setting", setting.value);
+      setting.value = newValue;
+      this.settings.set(key, setting);
+      console.log("setting new", setting.value);
+    }
+    console.log("updated", key, this.get(key)?.value);
+  }
+  // Resets a specific setting to its default value.
+  reset(key) {
+    const setting = this.get(key);
+    if (setting) {
+      setting.value = setting.defaultValue;
+      this.settings.set(key, setting);
+    }
+  }
+  // Resets all settings to their default values.
+  resetAll() {
+    if (this.settings) {
+      for (const s3 of this.settings.values()) {
+        s3.value = s3.defaultValue;
+        this.settings.set(s3.key, s3);
+      }
+    }
+  }
+  // Retrieves all settings in this system.
+  getAll() {
+    return Array.from(this.settings.values());
+  }
+};
 var STATE = /* @__PURE__ */ ((STATE2) => {
   STATE2[STATE2["CREATED"] = 0] = "CREATED";
   STATE2[STATE2["CONFIGURED"] = 1] = "CONFIGURED";
@@ -10100,6 +10170,7 @@ var App = class {
     this.services = new ServiceManager(this);
     this.integrations = new (opts.integrationsManagerType || IntegrationsManager)(this);
     const loginstance = this.logger.createWithTag(id);
+    this.settings = new Settings();
     this.info = loginstance.info;
     this.success = loginstance.success;
     this.debug = loginstance.debug;
@@ -10184,7 +10255,9 @@ var App = class {
   subscribeToServiceEvent(serviceOrId, event, handler) {
     const id = serviceOrId.id ?? serviceOrId;
     if (!this.services.has(id)) {
-      this.warn(`[SERVICE.SUB Service] ${this.id} subscribed to unknown service '${id}'. This can be ok in some cases, but usually indicates a bug.`);
+      this.warn(
+        `[SERVICE.SUB Service] ${this.id} subscribed to unknown service '${id}'. This can be ok in some cases, but usually indicates a bug.`
+      );
     }
     this.info(`[SERVICE.SUB App] ${this.id} subscribed to service event '${event}' on ${id}`);
     this.events.on(`${id}.${event}`, handler);
@@ -10198,25 +10271,24 @@ var App = class {
 };
 App.STATES = STATE;
 var BaseWorkflow = class _BaseWorkflow {
-  constructor(id, version, meta) {
-    this.id = id || "";
-    this.version = version || "draft";
+  constructor(id, meta) {
+    this.id = id ?? "";
     this.setMeta(meta);
     this.setRete(null);
     this.setAPI(null);
+    this.setBlockIds(/* @__PURE__ */ new Set());
     this.ui = {};
   }
   setMeta(meta) {
-    var _a, _b, _c, _d;
-    meta = JSON.parse(JSON.stringify(meta || {}));
-    meta = meta || { name: "New Recipe", description: "No description.", pictureUrl: "omni.png", author: "Anonymous" };
+    var _a, _b, _c, _d, _e;
+    meta = JSON.parse(JSON.stringify(meta ?? {}));
+    meta = meta ?? { name: "New Recipe", description: "No description.", pictureUrl: "omni.png", author: "Anonymous" };
     this.meta = meta;
-    this.meta.updated = Date.now();
-    (_a = this.meta).created ?? (_a.created = Date.now());
-    (_b = this.meta).tags ?? (_b.tags = []);
-    this.meta.updated = Date.now();
-    (_c = this.meta).author || (_c.author = "Anonymous");
-    (_d = this.meta).help || (_d.help = "");
+    (_a = this.meta).updated ?? (_a.updated = Date.now());
+    (_b = this.meta).created ?? (_b.created = Date.now());
+    (_c = this.meta).tags ?? (_c.tags = []);
+    (_d = this.meta).author || (_d.author = "Anonymous");
+    (_e = this.meta).help || (_e.help = "");
     this.meta.name = (0, import_insane.default)(this.meta.name, { allowedTags: [], allowedAttributes: {} });
     this.meta.description = (0, import_insane.default)(this.meta.description, { allowedTags: [], allowedAttributes: {} });
     this.meta.author = (0, import_insane.default)(this.meta.author, { allowedTags: [], allowedAttributes: {} });
@@ -10225,46 +10297,50 @@ var BaseWorkflow = class _BaseWorkflow {
   }
   setRete(rete) {
     this.rete = rete;
-    this.meta.updated = Date.now();
     return this;
   }
   setAPI(api) {
     this.api = api ?? { fields: {} };
-    this.meta.updated = Date.now();
     return this;
   }
   setUI(ui) {
     this.ui = ui ?? {};
-    this.meta.updated = Date.now();
     return this;
+  }
+  setBlockIds(ids) {
+    this.blockIds = ids;
+    return this;
+  }
+  get isBlank() {
+    return (this?.rete?.nodes ?? []).length === 0;
   }
   toJSON() {
     return {
       id: this.id,
-      version: this.version,
       meta: this.meta,
       rete: this.rete,
       api: this.api,
-      ui: this.ui
+      ui: this.ui,
+      blockIds: this.blockIds
     };
   }
   static fromJSON(json) {
-    const result = new _BaseWorkflow(json.id, json.version);
+    const result = new _BaseWorkflow(json.id);
     result.setMeta(json.meta);
     result.setRete(json.rete);
     result.setAPI(json.api);
     result.setUI(json.ui);
+    result.setBlockIds(json.blockIds);
     return result;
   }
 };
 var _Workflow = class _Workflow2 extends BaseWorkflow {
-  // Either 'public', organisation IDs, group IDs, or user IDs
-  constructor(id, version, data, meta) {
-    super(id, version, meta);
-    this._id = version == "draft" ? `wf:${id}` : `wf:${id}:${version}`;
+  // publishedTo: string[] // Either 'public', organisation IDs, group IDs, or user IDs
+  constructor(id, data, meta) {
+    super(id, meta);
+    this._id = `wf:${id}`;
     this.owner = data.owner;
     this.org = data.org;
-    this.publishedTo = [];
   }
   toJSON() {
     return {
@@ -10272,8 +10348,8 @@ var _Workflow = class _Workflow2 extends BaseWorkflow {
       _id: this._id,
       _rev: this._rev,
       owner: this.owner,
-      org: this.org,
-      publishedTo: this.publishedTo
+      org: this.org
+      // publishedTo: this.publishedTo
     };
   }
   static fromJSON(json) {
@@ -10281,12 +10357,18 @@ var _Workflow = class _Workflow2 extends BaseWorkflow {
     if (json.id && json.id.length > 16 && id.startsWith(json.id)) {
       id = json.id;
     }
-    const result = new _Workflow2(id, json.version ?? "draft", { owner: json.owner || json.meta.owner, org: json.org });
-    result.publishedTo = json.publishedTo;
+    const result = new _Workflow2(id, { owner: json.owner || json.meta.owner, org: json.org });
     result.setMeta(json.meta);
     result.setRete(json.rete);
     result.setAPI(json.api);
     result.setUI(json.ui);
+    if (json.blockIds) {
+      result.setBlockIds(json.blockIds);
+    } else if (json.rete.nodes) {
+      result.setBlockIds(new Set(Object.values(json.rete.nodes).map((node) => node.name)));
+    } else {
+      result.setBlockIds(/* @__PURE__ */ new Set());
+    }
     if (json._rev) {
       result._rev = json._rev;
     }
@@ -10341,8 +10423,8 @@ var _User = class _User2 extends DBObject {
     this.tier = null;
     this.password = null;
     this.salt = null;
-    this.token = null;
     this.tags = [];
+    this.settings = new Settings(this.id);
   }
   isAdmin() {
     return this.tags.some((tag) => tag === "admin");
@@ -10364,7 +10446,6 @@ var _User = class _User2 extends DBObject {
     result.tier = json.tier;
     result.password = json.password;
     result.salt = json.salt;
-    result.token = json.token;
     result.tags = json.tags;
     return result;
   }
