@@ -1,6 +1,6 @@
 //@ts-check
 // pdftodoc.js
-import { OAIBaseComponent, WorkerContext, OmniComponentMacroTypes } from 'mercs_rete';
+import { OAIBaseComponent, WorkerContext, OmniComponentMacroTypes } from 'omni-sockets';
 import { setComponentInputs, setComponentOutputs, setComponentControls } from './utils/components_lib.js';
 const NS_ONMI = 'pdf2doc';
 
