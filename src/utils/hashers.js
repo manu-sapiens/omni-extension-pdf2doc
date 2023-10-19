@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) 2023 MERCENARIES.AI PTE. LTD.
+ * All rights reserved.
+ */
+
 // hashers.js
 
 import { SHA256Hasher } from "./hashersSHA256.js";

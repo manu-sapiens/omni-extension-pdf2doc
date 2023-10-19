@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) 2023 MERCENARIES.AI PTE. LTD.
+ * All rights reserved.
+ */
+
 //@ts-check
 // pdftodoc.js
 import { OAIBaseComponent, WorkerContext, OmniComponentMacroTypes } from 'omni-sockets';

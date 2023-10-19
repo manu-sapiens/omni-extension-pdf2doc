@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) 2023 MERCENARIES.AI PTE. LTD.
+ * All rights reserved.
+ */
+
 // cdn.js
 
 import { is_valid, console_log, clean_string } from './utils.js';
